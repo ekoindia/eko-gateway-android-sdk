@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Eko Pay</string>
+    <string name="permission_location_rationale">AePS needs to get your current location to function properly.</string>
+</resources>
