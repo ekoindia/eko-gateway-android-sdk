@@ -46,15 +46,15 @@ public class EkoPayActivity extends AppCompatActivity {
 
     private WebView webView;
     private ProgressDialog progressDialog;
-    private String secret_key_timestamp, secret_key, developer_key, gateway_url, initiator_id, callback_url, user_code,
-            initiator_logo_url, partner_name, language, callback_url_custom_headers, callback_url_custom_params;
+    private String secret_key_timestamp, secret_key, developer_key, gateway_url, initiator_id,
+            callback_url, user_code, initiator_logo_url, partner_name, language,
+            callback_url_custom_headers, callback_url_custom_params, product, environment;
 
     private static final int MY_PERMISSION_REQUEST_LOCATION = 9003;     // Location Permission Request
     private static final int MY_PERMISSION_REQUEST_CAMERA = 9004;       // Location Permission Request
     private static final int REQUEST_SELECT_FILE = 9005;                // Show File Upload Dialog
     // private static final int REQUEST_SELECT_FILE_CAMERA = 9006;         // File Upload Dialog - Camera Input
     private static final int REQUEST_WRITE_EXT_STORAGE = 9007;
-    private int product;
 
     private static final String TAG = "MainActivity";
     private ValueCallback<Uri[]> mFilePathCallback;
@@ -116,7 +116,8 @@ public class EkoPayActivity extends AppCompatActivity {
         language = (String)bundle.get("language");
         callback_url_custom_headers = (String) bundle.get("callback_url_custom_headers");
         callback_url_custom_params = (String)bundle.get("callback_url_custom_params");
-        product = bundle.getInt("product");
+        product = (String) bundle.get("product");
+        environment = (String) bundle.get("environment");
 
         validateData();
 
@@ -125,7 +126,7 @@ public class EkoPayActivity extends AppCompatActivity {
         progressDialog.setCancelable(false);
 
 //        String url = "https://stagegateway.eko.in/v2/aeps";
-        String url = getUrl(product);
+        String url = getUrl(product, environment);
 //        String url = "https://gateway.eko.in/v2/aeps";   // Production
 //        String url = "http://192.168.61.37:3004/v2/aeps";  // Himanshi
         JSONObject source = new JSONObject();
@@ -159,14 +160,37 @@ public class EkoPayActivity extends AppCompatActivity {
         webView.postUrl(url, postData.getBytes());
     }
 
-    private String getUrl(int task) {
-        switch (task) {
-            case 1:
-                return "https://stagegateway.eko.in/v2/aeps";
+    private String getUrl(String product, String environment) {
+        if (environment==null) {
+            environment = "production";
+        }
+        switch (product) {
+            case "aeps":
+
+                if (environment.equals("uat")) {
+                    return "https://stagegateway.eko.in/v2/aeps";
+                } else if (environment.equals("production")) {
+                    return "https://gateway.eko.in/v2/aeps";
+                } else {
+                    error = "Please enter valid environment";
+                    closeSDK();
+                    return "";
+                }
+
+                default:
+                    error = "Enter valid value of product";
+                    closeSDK();
+                    return "";
+
+
+
+
+
+
+//                return "https://stagegateway.eko.in/v2/aeps";
 //                return "https://gateway.eko.in/v2/aeps";   // Production
 //                return "http://192.168.61.37:3004/v2/aeps";  // Himanshi
-            default:
-                return "https://stagegateway.eko.in/v2/aeps";
+
         }
     }
 
@@ -194,6 +218,9 @@ public class EkoPayActivity extends AppCompatActivity {
             closeSDK();
         } else if (partner_name == null || partner_name.equalsIgnoreCase("")) {
             error = "partner_name parameter not found";
+            closeSDK();
+        } else if (product == null || product.equalsIgnoreCase("")) {
+            error = "product parameter not found";
             closeSDK();
         }
     }
