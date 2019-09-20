@@ -132,6 +132,7 @@ public class EkoPayActivity extends AppCompatActivity {
         JSONObject source = new JSONObject();
         try {
             source.put("device", "Android");
+            source.put("android_sdk_version", "1.2.0");
             source.put("initiator_id", initiator_id);
             source.put("developer_key", developer_key);
             source.put("secret_key", secret_key);
