@@ -7,22 +7,22 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
-import android.support.annotation.Nullable;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
+
+import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.Window;
 import android.webkit.DownloadListener;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -38,11 +38,11 @@ import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-public class EkoPayActivity extends AppCompatActivity {
+import in.eko.uidai_rdservice_manager_lib.RDServiceEvents;
+import in.eko.uidai_rdservice_manager_lib.RDServiceManager;
+
+public class EkoPayActivity extends AppCompatActivity implements RDServiceEvents {
 
     private WebView webView;
     private ProgressDialog progressDialog;
@@ -64,33 +64,7 @@ public class EkoPayActivity extends AppCompatActivity {
     private String mGeolocationRequestOrigin;
     private GeolocationPermissions.Callback mGeolocationCallback;
 
-    // Map of RdService Providers vs IntentCode.....................................................
-    private static final String RD_SERVICE_PACKAGE_SECUGEN = "com.secugen.rdservice";
-    private static final String RD_SERVICE_PACKAGE_MORPHO = "com.scl.rdservice";
-    private static final String RD_SERVICE_PACKAGE_MANTRA = "com.mantra.rdservice";
-    private static final String RD_SERVICE_PACKAGE_STARTEK = "com.acpl.registersdk";        // Startek FM220
-    private static final String RD_SERVICE_PACKAGE_3M = "com.rd.gemalto.com.rdserviceapp";  // Gemalto 3M Cogent CSD 200
-    //private static final String RD_SERVICE_PACKAGE_TATVIK = "com.tatvik.bio.tmf20";       // Tatvik TMF20
-
-    private static final int RD_SERVICE_CAPTURE = 7000;
-
-    private static final int RD_SERVICE_INFO_SECUGEN = 7001;
-    private static final int RD_SERVICE_INFO_MORPHO = 7002;
-    private static final int RD_SERVICE_INFO_MANTRA = 7003;
-    private static final int RD_SERVICE_INFO_STARTEK = 7004;
-    private static final int RD_SERVICE_INFO_3M = 7005;
-    //private static final int RD_SERVICE_INFO_TATVIK = 7006;
-
-    private static final Map<String, Integer> RDSERVICE_MAP = new HashMap<String, Integer>() {
-        {
-            put(RD_SERVICE_PACKAGE_SECUGEN, RD_SERVICE_INFO_SECUGEN);
-            put(RD_SERVICE_PACKAGE_MORPHO, RD_SERVICE_INFO_MORPHO);
-            put(RD_SERVICE_PACKAGE_MANTRA, RD_SERVICE_INFO_MANTRA);
-            put(RD_SERVICE_PACKAGE_STARTEK, RD_SERVICE_INFO_STARTEK);
-            put(RD_SERVICE_PACKAGE_3M, RD_SERVICE_INFO_3M);
-            //put(RD_SERVICE_PACKAGE_TATVIK, RD_SERVICE_INFO_TATVIK);
-        }
-    };
+    private RDServiceManager rdServiceManager = null;
 
     private String result = null;
     private String error = null;
@@ -104,18 +78,18 @@ public class EkoPayActivity extends AppCompatActivity {
         setWebView();
 
         Bundle bundle = getIntent().getExtras();
-        secret_key_timestamp = (String)bundle.get("secret_key_timestamp");
-        secret_key = (String)bundle.get("secret_key");
-        developer_key = (String)bundle.get("developer_key");
-        gateway_url = (String)bundle.get("gateway_url");
-        initiator_id = (String)bundle.get("initiator_id");
-        callback_url = (String)bundle.get("callback_url");
-        user_code = (String)bundle.get("user_code");
-        initiator_logo_url = (String)bundle.get("initiator_logo_url");
-        partner_name = (String)bundle.get("partner_name");
-        language = (String)bundle.get("language");
+        secret_key_timestamp = (String) bundle.get("secret_key_timestamp");
+        secret_key = (String) bundle.get("secret_key");
+        developer_key = (String) bundle.get("developer_key");
+        gateway_url = (String) bundle.get("gateway_url");
+        initiator_id = (String) bundle.get("initiator_id");
+        callback_url = (String) bundle.get("callback_url");
+        user_code = (String) bundle.get("user_code");
+        initiator_logo_url = (String) bundle.get("initiator_logo_url");
+        partner_name = (String) bundle.get("partner_name");
+        language = (String) bundle.get("language");
         callback_url_custom_headers = (String) bundle.get("callback_url_custom_headers");
-        callback_url_custom_params = (String)bundle.get("callback_url_custom_params");
+        callback_url_custom_params = (String) bundle.get("callback_url_custom_params");
         product = (String) bundle.get("product");
         environment = (String) bundle.get("environment");
 
@@ -156,13 +130,15 @@ public class EkoPayActivity extends AppCompatActivity {
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-        String postData = "data="+data;
+        String postData = "data=" + data;
 
         webView.postUrl(url, postData.getBytes());
+
+        rdServiceManager = new RDServiceManager.Builder(this).create();
     }
 
     private String getUrl(String product, String environment) {
-        if (environment==null) {
+        if (environment == null) {
             environment = "production";
         }
         switch (product) {
@@ -178,14 +154,10 @@ public class EkoPayActivity extends AppCompatActivity {
                     return "";
                 }
 
-                default:
-                    error = "Enter valid value of product";
-                    closeSDK();
-                    return "";
-
-
-
-
+            default:
+                error = "Enter valid value of product";
+                closeSDK();
+                return "";
 
 
 //                return "https://stagegateway.eko.in/v2/aeps";
@@ -199,7 +171,7 @@ public class EkoPayActivity extends AppCompatActivity {
         if (secret_key_timestamp == null || secret_key_timestamp.equalsIgnoreCase("")) {
             error = "secret_key_timestamp parameter not found";
             closeSDK();
-        } else if(secret_key == null || secret_key.equalsIgnoreCase("")) {
+        } else if (secret_key == null || secret_key.equalsIgnoreCase("")) {
             error = "secret_key parameter not found";
             closeSDK();
         } else if (developer_key == null || developer_key.equalsIgnoreCase("")) {
@@ -261,12 +233,10 @@ public class EkoPayActivity extends AppCompatActivity {
         });
     }
 
-    public void doAction(String action, String data)
-    {
-        Log.d(TAG, "Android Action From SDK: " + action + "("+data+")");
+    public void doAction(String action, String data) {
+        Log.d(TAG, "Android Action From SDK: " + action + "(" + data + ")");
 
-        switch (action)
-        {
+        switch (action) {
             case "close":
                 closeSDK();
                 break;
@@ -338,12 +308,11 @@ public class EkoPayActivity extends AppCompatActivity {
     }
 
     private void closeSDK() {
-        if (error!=null && !error.equalsIgnoreCase("")) {
+        if (error != null && !error.equalsIgnoreCase("")) {
             Intent returnIntent = new Intent();
             returnIntent.putExtra("result", error);
             setResult(Activity.RESULT_CANCELED, returnIntent);
-        }
-        else if(result == null || result.equalsIgnoreCase("")) {
+        } else if (result == null || result.equalsIgnoreCase("")) {
             setResult(Activity.RESULT_CANCELED);
         } else {
             Intent returnIntent = new Intent();
@@ -413,7 +382,7 @@ public class EkoPayActivity extends AppCompatActivity {
 
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
-            if(getCallingActivity()!=null) {
+            if (getCallingActivity() != null) {
                 progressDialog.show();
             }
 
@@ -421,7 +390,7 @@ public class EkoPayActivity extends AppCompatActivity {
 
         @Override
         public void onPageFinished(WebView view, String url) {
-            if (progressDialog!=null && progressDialog.isShowing()) {
+            if (progressDialog != null && progressDialog.isShowing()) {
                 progressDialog.dismiss();
             }
         }
@@ -493,15 +462,13 @@ public class EkoPayActivity extends AppCompatActivity {
             final String[] requestedResources = request.getResources();
             for (String r : requestedResources) {
 
-                switch (r)
-                {
+                switch (r) {
 //                    case PermissionRequest.RESOURCE_VIDEO_CAPTURE:
 //                        requestPermissionHelper(request, Manifest.permission.CAMERA, R.string.permission_camera_rationale, MY_PERMISSION_REQUEST_CAMERA, requestedResources);
 //                        break;
                 }
             }
         }
-
 
 
         // This method is called when the permission request is canceled by the web content.
@@ -526,121 +493,29 @@ public class EkoPayActivity extends AppCompatActivity {
 
 
     private void discoverRdService() {
-
-        Intent intentServiceList = new Intent("in.gov.uidai.rdservice.fp.INFO");
-
-        List<ResolveInfo> resolveInfoList = getPackageManager().queryIntentActivities(intentServiceList, 0);
-
-        String packageNamesStr = "";
-
-        if (resolveInfoList.isEmpty())
-        {
-            sendWebViewResponse("rdservice_discovery_failed", "");
-            return;
-        }
-
-        for (ResolveInfo resolveInfo :resolveInfoList)
-        {
-            try
-            {
-                Integer packageWhitelistExtra = RDSERVICE_MAP.get(resolveInfo.activityInfo.packageName);
-
-                if (packageWhitelistExtra != null) {
-
-                    packageNamesStr += (packageNamesStr == "" ? "" : ", ") + resolveInfo.activityInfo.packageName;
-
-                    // Get RD Service Info
-                    Intent intentInfo = new Intent("in.gov.uidai.rdservice.fp.INFO");
-                    intentInfo.setPackage(resolveInfo.activityInfo.packageName);
-                    startActivityForResult(intentInfo, packageWhitelistExtra);
-
-                    Log.e(TAG, "RD SERVICE Package Found: " + resolveInfo.activityInfo.packageName);
-                }
-                else
-                {
-                    Log.e(TAG, "Connect RD Service: Unlisted Package Found: " + resolveInfo.activityInfo.packageName);
-                }
-            }
-            catch (Exception e)
-            {
-                e.printStackTrace();
-            }
-        }
-
-        // toast("RDSERVICES: " + packageNamesStr);
-
-        // Testing Notifications...
-        // sendWebViewResponse("fcm_push_msg", "{\"id\":112,\"notification_type\":\"0\",\"cmd\":\"1\",\"metadata\":\"\",\"title\":\"Get Loan 2 Connect notification\",\"desc\":\"Notification description\",\"markdown\":0,\"youtube\":\"\",\"image\":\"https://images6.alphacoders.com/405/405735.jpg\",\"qr_code\":\"\",\"link\":\"\",\"link_label\":\"\",\"priority\":\"3\",\"state\":2,\"notify_time\":\"2018-11-01 17:50:00\",\"expiry_time\":\"2019-10-27 18:54:00\",\"read\":0,\"rating\":0,\"reaction\":0,\"feedback\":\"\"}");
+        rdServiceManager.discoverRdService();
     }
 
-
-    private void onRDServiceInfoResponse(Intent data, String rd_service_package)
-    {
-        Bundle b = data.getExtras();
-
-        if (b != null)
-        {
-            sendWebViewResponse("rdservice_info", b.getString("RD_SERVICE_INFO", "") + "<RD_SERVICE_ANDROID_PACKAGE=\"" + rd_service_package + "\" />");
-
-            Log.i(TAG, "onRDServiceInfoResponse: Device Info: \n\n Device = " + b.getString("DEVICE_INFO", "") + "    \n\nRDService = " + b.getString("RD_SERVICE_INFO", ""));
-        }
-    }
-
-
-    private void captureRdService(String data)
-    {
+    private void captureRdService(String data) {
         try {
             JSONObject jsonData = new JSONObject(data);
 
             String _package = jsonData.getString("package");
             String _pidopts = jsonData.getString("pidopts");
-            // String _url = jsonData.getString("url");
-
-            Log.d(TAG, "RDSERVICE BEFORE CAPTURE: pid_options: " + _pidopts);
-
-            // toast("PID_OPTS: " + _pidopts, Toast.LENGTH_LONG);
-
-            // Capture fingerprint using RD Service
-            Intent intentCap = new Intent("in.gov.uidai.rdservice.fp.CAPTURE");              // _url);
-            intentCap.setPackage(_package);
-
-            intentCap.putExtra("PID_OPTIONS", _pidopts);
-
-            startActivityForResult(intentCap, RD_SERVICE_CAPTURE);
-
+            rdServiceManager.captureRdService(_package, _pidopts);
         } catch (JSONException e) {
             e.printStackTrace();
         }
     }
 
-
-
-    private void onRDServiceCaptureResponse(Intent data)
-    {
-        Bundle b = data.getExtras();
-
-        if (b != null)
-        {
-            sendWebViewResponse("rdservice_resp", b.getString("PID_DATA", ""));
-
-            Log.i(TAG, "onRDServiceCaptureResponse: Capture Info: \n\n PID-DATA = " + b.getString("PID_DATA", "") + "    \n\nDeviceNotConnected = " + b.getString("DNC", ""));
-        }
-    }
-
-
-
-
-
     // ===================================================================================================
 
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults)
-    {
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
 
 
-        switch (requestCode)
-        {
+        switch (requestCode) {
             case MY_PERMISSION_REQUEST_LOCATION: {
 
 
@@ -691,11 +566,9 @@ public class EkoPayActivity extends AppCompatActivity {
     }
 
 
-
     // ===================================================================================================
 
-    protected void sendWebViewResponse(final String action, final String data)
-    {
+    protected void sendWebViewResponse(final String action, final String data) {
 //        if (connectReady)
 //        {
         webView.post(new Runnable() {
@@ -723,59 +596,48 @@ public class EkoPayActivity extends AppCompatActivity {
         }*/
     }
 
+
+    @Override
+    public void onRDServiceDriverDiscovery(String rdServiceInfo, String rdServicePackage, Boolean isWhitelisted) {
+        Log.d(TAG, "onRDServiceDriverDiscovery: " + isWhitelisted + " ~ " + rdServiceInfo + " ~ " + rdServicePackage);
+
+        sendWebViewResponse("rdservice_info",
+                rdServiceInfo +
+                        "<RD_SERVICE_ANDROID_PACKAGE=\"" + rdServicePackage + "\" " +
+                        (isWhitelisted ? "WHITELISTED" : "") +
+                        " />");
+        //sendWebViewResponse("rdservice_info", b.getString("RD_SERVICE_INFO", "") + "<RD_SERVICE_ANDROID_PACKAGE=\"" + rd_service_package + "\" />");
+    }
+
+    @Override
+    public void onRDServiceCaptureResponse(String pidData, String rdServicePackage) {
+        Log.i(TAG, "onRDServiceCaptureResponse: Capture Info: \n\n PID-DATA = " + pidData);
+        sendWebViewResponse("rdservice_resp", pidData);
+    }
+
+    @Override
+    public void onRDServiceDriverNotFound() {
+        sendWebViewResponse("rdservice_discovery_failed", "");
+    }
+
+    @Override
+    public void onRDServiceDriverDiscoveryFailed(int resultCode, Intent data, String pkg, String reason) {
+        Log.d(TAG, "onRDServiceDriverDiscoveryFailed: " + resultCode + " ~ " + data + " ~ " + pkg + " ~ " + reason);
+    }
+
+    @Override
+    public void onRDServiceCaptureFailed(int resultCode, Intent data, String pkg) {
+        Toast.makeText(this, "Fingerprint capture failed!", Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
         Log.i(TAG, "onActivityResult: " + requestCode + ", " + resultCode);
-
-        if(resultCode == Activity.RESULT_OK) {
-            switch (requestCode) {
-                case RD_SERVICE_CAPTURE:
-                    onRDServiceCaptureResponse(data);
-                    break;
-
-                case RD_SERVICE_INFO_MORPHO:
-                    onRDServiceInfoResponse(data, RD_SERVICE_PACKAGE_MORPHO);
-                    break;
-
-                case RD_SERVICE_INFO_SECUGEN:
-                    onRDServiceInfoResponse(data, RD_SERVICE_PACKAGE_SECUGEN);
-                    break;
-
-                case RD_SERVICE_INFO_MANTRA:
-                    onRDServiceInfoResponse(data, RD_SERVICE_PACKAGE_MANTRA);
-                    break;
-
-                case RD_SERVICE_INFO_STARTEK:
-                    onRDServiceInfoResponse(data, RD_SERVICE_PACKAGE_STARTEK);
-                    break;
-            }
-        } else {
-            switch (requestCode) {
-                case RD_SERVICE_CAPTURE:
-                    Toast.makeText(this, "Fingerprint capture failed!", Toast.LENGTH_SHORT).show();
-                    break;
-
-                case RD_SERVICE_INFO_MORPHO:
-                    Toast.makeText(this, "Morpho Service Discovery Failed!", Toast.LENGTH_SHORT).show();
-                    break;
-
-                case RD_SERVICE_INFO_SECUGEN:
-                    Toast.makeText(this, "Secugen Service Discovery Failed!", Toast.LENGTH_SHORT).show();
-                    break;
-
-                case RD_SERVICE_INFO_MANTRA:
-                    Toast.makeText(this, "Mantra Service Discovery Failed!", Toast.LENGTH_SHORT).show();
-                    break;
-
-                case RD_SERVICE_INFO_STARTEK:
-                    Toast.makeText(this, "Startek Service Discovery Failed!", Toast.LENGTH_SHORT).show();
-                    break;
-
-                default:
-                    Toast.makeText(this, "Something went wrong!", Toast.LENGTH_SHORT).show();
-            }
+        if (rdServiceManager != null) {
+            rdServiceManager.onActivityResult(requestCode, resultCode, data);
         }
+
     }
 }
